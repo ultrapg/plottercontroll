@@ -1,8 +1,10 @@
+use crate::estimator::{self, EstimateResult};
 use crate::gcode_gen::{export_to_file, generate_gcode, GCodeConfig};
 use crate::geometry::{BoundingBox, PathData, Point};
 use crate::importers::png::{import_png, PngImportConfig};
 use crate::importers::svg::{import_svg, SvgImportConfig};
 use crate::importers::text::{text_to_paths, TextImportConfig};
+use crate::optimizer;
 use crate::profiles::{self, DeviceProfile};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -99,6 +101,8 @@ pub struct AppState {
     pub dragging: bool,
     pub profiles: Vec<DeviceProfile>,
     pub profile_name: String,
+    pub estimate: Option<EstimateResult>,
+    pub estimate_dirty: bool,
 }
 
 #[derive(Clone)]
@@ -208,6 +212,8 @@ impl Default for AppState {
             dragging: false,
             profiles,
             profile_name,
+            estimate: None,
+            estimate_dirty: true,
         }
     }
 }
@@ -270,6 +276,7 @@ impl AppState {
         }
         self.bbox = BoundingBox::from_paths(&self.paths);
         self.gcode_dirty = true;
+        self.estimate_dirty = true;
     }
 
     pub fn add_text(&mut self, text: &str, config: TextImportConfig) -> usize {
@@ -343,6 +350,7 @@ impl AppState {
         }
         self.bbox = BoundingBox::from_paths(&self.paths);
         self.gcode_dirty = true;
+        self.estimate_dirty = true;
     }
 
     pub fn set_file_scale(&mut self, idx: usize, scale: f64) {
@@ -454,6 +462,7 @@ impl AppState {
         }
         self.bbox = BoundingBox::from_paths(&self.paths);
         self.gcode_dirty = true;
+        self.estimate_dirty = true;
         self.status = format!("Auto-fit: scale={:.3}, offset=({:.1}, {:.1})", scale, offset_x, offset_y);
     }
 
@@ -531,10 +540,63 @@ impl AppState {
     }
 
     pub fn estimated_length(&self) -> f64 {
-        self.paths
-            .iter()
-            .flat_map(|p| p.points.windows(2))
-            .map(|w| w[0].distance_to(w[1]))
-            .sum()
+        self.paths.iter().map(|p| {
+            if p.points.len() < 2 {
+                return 0.0;
+            }
+            let seg_sum: f64 = p.points.windows(2)
+                .map(|w| w[0].distance_to(w[1]))
+                .sum();
+            if p.closed && p.points.len() > 2 {
+                let d = p.points[0].distance_to(p.points[p.points.len() - 1]);
+                if d > 0.01 {
+                    return seg_sum + d;
+                }
+            }
+            seg_sum
+        }).sum()
+    }
+
+    pub fn optimize_paths(&mut self) {
+        let ranges: Vec<(usize, usize)> = self.source_elements.iter().map(|e| {
+            match e {
+                SourceElement::File(fs) => (fs.path_start, fs.path_count),
+                SourceElement::Text(te) => (te.path_start, te.path_count),
+            }
+        }).collect();
+
+        let (new_paths, new_ranges) = optimizer::optimize_path_order(
+            &self.paths,
+            &self.gcode_config.optimizer_config,
+            &ranges,
+        );
+
+        self.paths = new_paths;
+        for (i, elem) in self.source_elements.iter_mut().enumerate() {
+            if i < new_ranges.len() {
+                let (start, count) = new_ranges[i];
+                match elem {
+                    SourceElement::File(ref mut fs) => {
+                        fs.path_start = start;
+                        fs.path_count = count;
+                    }
+                    SourceElement::Text(ref mut te) => {
+                        te.path_start = start;
+                        te.path_count = count;
+                    }
+                }
+            }
+        }
+        self.bbox = BoundingBox::from_paths(&self.paths);
+        self.gcode_dirty = true;
+        self.estimate_dirty = true;
+        self.status = format!("Optimized {} paths", self.paths.len());
+    }
+
+    pub fn refresh_estimate(&mut self) {
+        if self.estimate_dirty {
+            self.estimate = Some(estimator::estimate(&self.paths, &self.gcode_config));
+            self.estimate_dirty = false;
+        }
     }
 }

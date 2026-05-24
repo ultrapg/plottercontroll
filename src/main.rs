@@ -1,9 +1,11 @@
 mod app;
 mod cli;
+mod estimator;
 mod gcode_gen;
 mod geometry;
 mod hershey;
 mod importers;
+mod optimizer;
 mod profiles;
 mod project;
 mod serial;

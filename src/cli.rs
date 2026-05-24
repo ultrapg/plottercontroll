@@ -62,6 +62,22 @@ pub struct CliArgs {
     /// Force Hershey single-line font (disable TTF)
     #[arg(long = "force-hershey")]
     pub force_hershey: bool,
+
+    /// Enable path travel optimization (default: true)
+    #[arg(long = "optimize", default_value = "true")]
+    pub optimize: bool,
+
+    /// Use global (all paths) instead of per-element optimization
+    #[arg(long = "optimize-global")]
+    pub optimize_global: bool,
+
+    /// Optimization algorithm: "nearest-neighbor" or "2-opt"
+    #[arg(long = "optimize-algo", default_value = "nearest-neighbor")]
+    pub optimize_algo: String,
+
+    /// Print time and ink usage estimates
+    #[arg(long = "stats")]
+    pub stats: bool,
 }
 
 /// Run the CLI pipeline: load, export, and/or stream.
@@ -98,9 +114,24 @@ pub fn run_cli(args: &CliArgs) -> anyhow::Result<()> {
         state.load_text(text, Some(text_config));
     }
 
+    // Configure optimizer
+    state.gcode_config.optimizer_config.enabled = args.optimize;
+    if args.optimize_global {
+        state.gcode_config.optimizer_config.scope = crate::optimizer::OptimizerScope::Global;
+    }
+    state.gcode_config.optimizer_config.algorithm = match args.optimize_algo.as_str() {
+        "2-opt" => crate::optimizer::OptimizerAlgorithm::TwoOpt,
+        _ => crate::optimizer::OptimizerAlgorithm::NearestNeighbor,
+    };
+
     // Auto-fit to bed
     if !state.paths.is_empty() {
         state.auto_fit();
+    }
+
+    // Optimize paths
+    if state.gcode_config.optimizer_config.enabled && !state.paths.is_empty() {
+        state.optimize_paths();
     }
 
     if state.paths.is_empty() {
@@ -112,6 +143,20 @@ pub fn run_cli(args: &CliArgs) -> anyhow::Result<()> {
     println!("Bounding box: {:.1}x{:.1} mm", state.bbox.width(), state.bbox.height());
     println!("Estimated drawing length: {:.0} mm", state.estimated_length());
     println!("G-code size: {} bytes", state.get_gcode().len());
+
+    if args.stats || args.optimize {
+        state.refresh_estimate();
+        if let Some(ref est) = state.estimate {
+            println!();
+            println!("--- Time & Ink Estimate ---");
+            println!("Drawing:  {}", est.drawing_time_formatted());
+            println!("Travel:   {}", est.travel_time_formatted());
+            println!("Pen U/D:  {}", est.pen_up_down_time_formatted());
+            println!("Total:    {}", est.total_time_formatted());
+            println!("Length:   {:.1} m", est.ink_length_m);
+            println!("Ink:      {:.1} mm³", est.ink_volume_mm3);
+        }
+    }
 
     // Export to file
     if let Some(ref output_path) = args.output {

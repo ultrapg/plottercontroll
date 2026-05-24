@@ -1,4 +1,5 @@
 use crate::gcode_gen::GCodeConfig;
+use crate::optimizer::{OptimizerAlgorithm, OptimizerScope};
 
 #[derive(Debug, Clone)]
 pub struct DeviceProfile {
@@ -51,6 +52,23 @@ fn parse_profile(text: &str) -> Result<DeviceProfile, String> {
             "y_axis_invert" => config.y_axis_invert = val.parse().map_err(|e| format!("y_axis_invert: {}", e))?,
             "auto_home" => config.auto_home = val.parse().map_err(|e| format!("auto_home: {}", e))?,
             "travel_feedrate" => config.travel_feedrate = val.parse().map_err(|e| format!("travel_feedrate: {}", e))?,
+            "optimize_enabled" => config.optimizer_config.enabled = val.parse().map_err(|e| format!("optimize_enabled: {}", e))?,
+            "optimize_reverse" => config.optimizer_config.reverse_paths = val.parse().map_err(|e| format!("optimize_reverse: {}", e))?,
+            "optimize_start_near_origin" => config.optimizer_config.start_at_closest_to_origin = val.parse().map_err(|e| format!("optimize_start_near_origin: {}", e))?,
+            "optimize_scope" => {
+                config.optimizer_config.scope = match val {
+                    "per-element" => OptimizerScope::PerElement,
+                    "global" => OptimizerScope::Global,
+                    _ => return Err(format!("optimize_scope: expected 'per-element' or 'global', got '{}'", val)),
+                };
+            }
+            "optimize_algorithm" => {
+                config.optimizer_config.algorithm = match val {
+                    "nearest-neighbor" => OptimizerAlgorithm::NearestNeighbor,
+                    "2-opt" => OptimizerAlgorithm::TwoOpt,
+                    _ => return Err(format!("optimize_algorithm: expected 'nearest-neighbor' or '2-opt', got '{}'", val)),
+                };
+            }
             _ => log::warn!("Unknown profile key '{}'", key),
         }
     }

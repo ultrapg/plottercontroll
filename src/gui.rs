@@ -813,6 +813,86 @@ impl eframe::App for PlotterApp {
                                 }
                             });
                         }
+                        ui.separator();
+                        egui::CollapsingHeader::new("Path Optimization (Experimental)")
+                            .id_salt("sb_opt")
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                if ui.checkbox(&mut self.state.gcode_config.optimizer_config.enabled, "Enable travel optimization")
+                                    .on_hover_text("Reorder paths to minimize pen-up travel distance between paths.")
+                                    .changed() {
+                                    self.state.gcode_dirty = true;
+                                }
+                                if self.state.gcode_config.optimizer_config.enabled {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Algorithm:");
+                                        let algo_label = match self.state.gcode_config.optimizer_config.algorithm {
+                                            crate::optimizer::OptimizerAlgorithm::NearestNeighbor => "Nearest Neighbor",
+                                            crate::optimizer::OptimizerAlgorithm::TwoOpt => "2-opt",
+                                        };
+                                        egui::ComboBox::from_id_salt("opt_algo")
+                                            .selected_text(algo_label)
+                                            .show_ui(ui, |ui| {
+                                                if ui.selectable_label(
+                                                    self.state.gcode_config.optimizer_config.algorithm == crate::optimizer::OptimizerAlgorithm::NearestNeighbor,
+                                                    "Nearest Neighbor",
+                                                ).clicked() {
+                                                    self.state.gcode_config.optimizer_config.algorithm = crate::optimizer::OptimizerAlgorithm::NearestNeighbor;
+                                                    self.state.gcode_dirty = true;
+                                                }
+                                                if ui.selectable_label(
+                                                    self.state.gcode_config.optimizer_config.algorithm == crate::optimizer::OptimizerAlgorithm::TwoOpt,
+                                                    "2-opt",
+                                                ).clicked() {
+                                                    self.state.gcode_config.optimizer_config.algorithm = crate::optimizer::OptimizerAlgorithm::TwoOpt;
+                                                    self.state.gcode_dirty = true;
+                                                }
+                                            });
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label("Scope:");
+                                        let scope_label = match self.state.gcode_config.optimizer_config.scope {
+                                            crate::optimizer::OptimizerScope::PerElement => "Per-Element",
+                                            crate::optimizer::OptimizerScope::Global => "Global (All Paths)",
+                                        };
+                                        egui::ComboBox::from_id_salt("opt_scope")
+                                            .selected_text(scope_label)
+                                            .show_ui(ui, |ui| {
+                                                if ui.selectable_label(
+                                                    self.state.gcode_config.optimizer_config.scope == crate::optimizer::OptimizerScope::PerElement,
+                                                    "Per-Element",
+                                                ).clicked() {
+                                                    self.state.gcode_config.optimizer_config.scope = crate::optimizer::OptimizerScope::PerElement;
+                                                    self.state.gcode_dirty = true;
+                                                }
+                                                if ui.selectable_label(
+                                                    self.state.gcode_config.optimizer_config.scope == crate::optimizer::OptimizerScope::Global,
+                                                    "Global (All Paths)",
+                                                ).clicked() {
+                                                    self.state.gcode_config.optimizer_config.scope = crate::optimizer::OptimizerScope::Global;
+                                                    self.state.gcode_dirty = true;
+                                                }
+                                            });
+                                    });
+                                    if ui.checkbox(&mut self.state.gcode_config.optimizer_config.reverse_paths, "Allow path reversal")
+                                        .on_hover_text("Reverse paths if it means shorter travel to the next start point.")
+                                        .changed() {
+                                        self.state.gcode_dirty = true;
+                                    }
+                                    if ui.checkbox(&mut self.state.gcode_config.optimizer_config.start_at_closest_to_origin, "Start near origin")
+                                        .on_hover_text("Begin the first path nearest to (0,0).")
+                                        .changed() {
+                                        self.state.gcode_dirty = true;
+                                    }
+                                    if ui.button("Optimize Paths Now")
+                                        .on_hover_text("Recompute the path order using current settings.")
+                                        .clicked() {
+                                        self.state.save_snapshot();
+                                        self.state.optimize_paths();
+                                        self.needs_zoom_fit = true;
+                                    }
+                                }
+                            });
                     });
 
                 egui::CollapsingHeader::new("Positioning")

@@ -1,4 +1,5 @@
 use crate::geometry::{PathData, Point};
+use crate::optimizer::OptimizerConfig;
 use std::fmt::Write;
 
 /// Configuration for G-code generation.
@@ -19,6 +20,7 @@ pub struct GCodeConfig {
     pub min_segment_time: f64,
     pub const_speed_min_feedrate: f64,
     pub const_speed_max_feedrate: f64,
+    pub optimizer_config: OptimizerConfig,
 }
 
 impl Default for GCodeConfig {
@@ -45,6 +47,7 @@ impl GCodeConfig {
             min_segment_time: 0.05,
             const_speed_min_feedrate: 400.0,
             const_speed_max_feedrate: 3000.0,
+            optimizer_config: OptimizerConfig::default(),
         }
     }
 }
@@ -56,6 +59,15 @@ fn fmt_coord(v: f64) -> String {
 fn transform_point(p: Point, config: &GCodeConfig) -> Point {
     let y = if config.y_axis_invert { -p.y } else { p.y };
     Point::new(p.x, y)
+}
+
+pub fn segment_feedrate(seg_len: f64, config: &GCodeConfig) -> f64 {
+    if config.const_speed && config.min_segment_time > 0.0 && seg_len > 0.001 {
+        let capped = seg_len / config.min_segment_time * 60.0;
+        capped.max(config.const_speed_min_feedrate).min(config.const_speed_max_feedrate)
+    } else {
+        config.feedrate_xy
+    }
 }
 
 /// Generate full G-code from paths.
@@ -130,12 +142,7 @@ pub fn generate_gcode(paths: &[PathData], config: &GCodeConfig) -> String {
             let tp = transform_point(p, config);
             let seg_len = prev.distance_to(tp);
             prev = tp;
-            let feed = if config.const_speed && config.min_segment_time > 0.0 && seg_len > 0.001 {
-                let capped = seg_len / config.min_segment_time * 60.0;
-                capped.max(config.const_speed_min_feedrate).min(config.const_speed_max_feedrate)
-            } else {
-                config.feedrate_xy
-            };
+            let feed = segment_feedrate(seg_len, config);
             writeln!(
                 gcode,
                 "G1 X{} Y{} F{}",
@@ -151,12 +158,7 @@ pub fn generate_gcode(paths: &[PathData], config: &GCodeConfig) -> String {
             let last = transform_point(path.points[path.points.len() - 1], config);
             let d = first.distance_to(last);
             if d > 0.01 {
-                let feed = if config.const_speed && config.min_segment_time > 0.0 && d > 0.001 {
-                    let capped = d / config.min_segment_time * 60.0;
-                    capped.max(config.const_speed_min_feedrate).min(config.const_speed_max_feedrate)
-                } else {
-                    config.feedrate_xy
-                };
+                let feed = segment_feedrate(d, config);
                 writeln!(
                     gcode,
                     "G1 X{} Y{} F{}",
