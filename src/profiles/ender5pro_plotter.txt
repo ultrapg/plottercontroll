@@ -1,0 +1,15 @@
+name = Ender 5 Pro (Pen Plotter Mod)
+pen_up_z = 5.0
+pen_down_z = 0.0
+pen_thickness = 0.5
+feedrate_xy = 3000.0
+min_feedrate_xy = 500.0
+feedrate_z = 300.0
+bed_width = 220.0
+bed_height = 220.0
+y_axis_invert = true
+auto_home = true
+travel_feedrate = 5000.0
+min_segment_time = 0.05
+const_speed_min_feedrate = 400.0
+const_speed_max_feedrate = 3000.0
