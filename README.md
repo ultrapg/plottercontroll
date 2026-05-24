@@ -5,18 +5,29 @@ Converts SVG, PNG, and text into G-code, previews toolpaths, and streams to the 
 
 ## Features
 
-- **SVG Import** — Vector extraction via `usvg` with full path support, or raster-render + threshold + contour tracing. Ramer-Douglas-Peucker simplification.
-- **PNG Import** — Three modes: Edge Detection (Canny + Sobel fallback), Monochrome (Otsu threshold + contour trace), Centerlines (Zhang-Suen thinning skeleton). Optional hatch fill.
-- **Text Rendering** — TTF/OTF outline extraction via `ttf_parser`, auto-fallback to built-in 95-character Hershey single-line font. Multiline, letter spacing, hatch fill.
-- **Device Profiles** — Built-in profiles (Ender 5 Pro Pen Plotter Mod, Default) loaded from `src/profiles/*.txt` at compile time. Select via Device toolbar menu.
-- **Constant Pen Speed** — Per-segment feedrate capping so every segment takes the same minimum time. Clamped between configurable min/max feedrate to avoid ink bleeding and uneven lines.
-- **G-Code Engine** — Configurable Z up/down, XY/Z/travel feedrates, Y-axis inversion (bed-slinger), auto-home, bed dimensions.
-- **USB Serial Streaming** — Send-wait-`ok` handshake protocol. Background thread with `AtomicBool` cancellation, `mpsc` status channel.
-- **Unified Element Manager** — Multiple file sources (SVG/PNG) and text elements in a single ordered list. Per-element scale slider, font size adjust, visibility toggle, drag-to-position, reorder.
+**Input formats**
+
+- **SVG** — vector extraction via `usvg` with full path support, or raster-render + threshold + contour tracing. Ramer-Douglas-Peucker simplification included.
+- **PNG** — three import modes: Edge Detection (Canny + Sobel fallback), Monochrome (Otsu threshold + contour trace), Centerlines (Zhang-Suen thinning). Optional hatch fill.
+- **Text** — TTF/OTF outline extraction via `ttf_parser`, automatic fallback to built-in 95-character Hershey single-line font. Multiline, letter spacing, hatch fill.
+
+**G-code & streaming**
+
+- **Constant Pen Speed** — per-segment feedrate capping so every segment takes the same minimum time. Configurable min/max bounds to prevent ink bleeding and uneven lines.
+- **G-Code Engine** — configurable Z up/down, XY/Z/travel feedrates, Y-axis inversion (bed-slinger), auto-home, bed dimensions.
+- **USB Serial Streaming** — send-wait-`ok` handshake, background thread with `AtomicBool` cancellation, `mpsc` status channel.
+
+**GUI**
+
+- **Unified Element Manager** — multiple file sources and text elements in a single ordered list. Per-element scale slider, font size adjust, visibility, drag-to-position, reorder.
 - **Project Save/Open** — JSON `.pcp` format via serde — self-contained, stores all paths, config, and positions.
 - **Undo/Redo** — 50-level snapshot stack covering position, scale, visibility, and element changes.
-- **Toolpath Preview** — Color-coded paths, zoom/pan, grid, bed outline, start-point markers, position offset display.
-- **Embedded Text Editor** — Custom Rust editor with copy/paste, cursor navigation, multiline (avoids egui TextEdit issues on Wayland/ARM).
+- **Toolpath Preview** — color-coded paths, zoom/pan, grid overlay, bed outline, start-point markers.
+- **Embedded Text Editor** — custom Rust editor with copy/paste, cursor navigation, multiline (avoids egui TextEdit issues on Wayland/ARM).
+
+**Device profiles**
+
+Built-in profiles are compiled in at build time from `src/profiles/*.txt`. The Device toolbar menu lets you switch between profiles instantly — handy for multiple machines or different pen setups.
 
 ## Quick Start
 
@@ -65,9 +76,9 @@ cargo run --release --no-default-features -- --list-ports
 
 ### Top Bar
 - **File**: Export G-code, Save Project (`.pcp`), Open Project, Clear, Quit
-- **Import**: SVG, PNG (each opens a config dialog)
+- **Import**: SVG, PNG (each opens a config dialog with preview options)
 - **View**: Zoom to Fit, Zoom In/Out, Reset Zoom, Reset Pan
-- **Device**: Profile picker (Custom + all built-in profiles)
+- **Device**: Profile picker — Custom or any built-in profile
 
 ### Left Sidebar (collapsible sections)
 | Section | Controls |
