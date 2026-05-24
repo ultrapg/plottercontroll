@@ -130,6 +130,32 @@ cargo test --no-default-features
 |---|---|---|
 | `gui` | Yes | egui/eframe/rfd for GUI. Disable with `--no-default-features` |
 
+## Architecture
+
+```
+├── Cargo.toml
+├── build.rs              Build script: auto-discovers src/profiles/*.txt
+└── src/
+    ├── main.rs           Entry point — CLI/GUI dispatch
+    ├── geometry.rs       Point, PathData, BoundingBox, RDP simplification
+    ├── gcode_gen.rs      GCodeConfig, generate_gcode(), export_to_file(), const-speed logic
+    ├── hershey.rs        Hershey single-line font data (95 chars) + renderer
+    ├── serial.rs         USB serial port enumeration, open, send-wait-ok streaming
+    ├── profiles.rs       DeviceProfile struct, parse_profile(), builtin_profiles() via include!
+    ├── app.rs            AppState: source_elements, paths, gcode, undo/redo, profiles
+    ├── cli.rs            CliArgs (clap), run_cli(), list_available_ports()
+    ├── gui.rs            PlotterApp (eframe), sidebar, canvas, element manager, dialogs
+    ├── text_editor.rs    Custom egui text editor (copy/paste, cursor, multiline)
+    ├── project.rs        Save/load .pcp project files (serde JSON)
+    ├── profiles/         Compiled-in device profile .txt files
+    │   ├── default.txt
+    │   └── ender5pro_plotter.txt
+    └── importers/
+        ├── svg.rs        SVG → paths (vector or raster mode)
+        ├── png.rs        PNG → paths (EdgeDetection / Monochrome / Centerlines)
+        └── text.rs       Text → paths (TTF outline + Hershey fallback + hatch fill)
+```
+
 ## Troubleshooting
 
 | Problem | Solution |
